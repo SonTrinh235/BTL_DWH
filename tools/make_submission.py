@@ -30,7 +30,8 @@ def add_tree(z: zipfile.ZipFile, folder: Path, arc_root: str) -> int:
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")  # console Windows mặc định cp1252 không in được tiếng Việt
     ap = argparse.ArgumentParser()
-    ap.add_argument("--slides", type=Path, help="file slide thuyết trình (PDF)")
+    ap.add_argument("--slides", type=Path, default=ROOT / "slides" / "Slide_CO4031.pdf",
+                    help="file slide thuyết trình (PDF); mặc định slides/Slide_CO4031.pdf")
     args = ap.parse_args()
 
     problems = []
