@@ -1,0 +1,55 @@
+\chapter{Đánh giá}\label{ch:eval}
+
+\section{Tiêu chí đánh giá}
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Đánh giá theo tiêu chí thành công đã đặt ra (Mục 2.4.2)}
+\small
+\begin{tabularx}{\textwidth}{|p{5.2cm}|X|p{1.7cm}|}
+\hline
+\textbf{Tiêu chí} & \textbf{Kết quả đo được} & \textbf{Đạt?} \\ \hline
+Nạp từ nguồn thô bằng một lệnh, toàn vẹn khóa ngoại & ETL $\approx$ 25 giây; 16 khóa ngoại; kiểm thử không có khóa ngoại trỏ tới bản ghi không tồn tại (orphan), không trùng khóa & Đạt \\ \hline
+Truy vấn tương tác dưới 1 giây & Qua bảng phẳng: 0,09--0,16 giây (trước tối ưu: 5,7--6,0 giây); cube 3 chiều $\approx$ 1,2 giây & Đạt (trừ cube nhiều chiều) \\ \hline
+AUC $\geq$ 0,75 và Brier tốt hơn mô hình nền & AUC 0,794; Brier 0,0859 so với 0,0977 & Đạt \\ \hline
+Trả lời ``ưu tiên nhóm nào'' trong $\leq$ 3 thao tác & Trang DSS: nhập ngân sách, chọn phân khúc, đọc xếp hạng & Đạt \\ \hline
+Truy vết về nguồn & \code{etl_log} và trang Kho dữ liệu \& ETL; đối chiếu thủ công 4 bản ghi với file XPT gốc khớp hoàn toàn & Đạt \\ \hline
+\end{tabularx}
+\end{table}
+
+\section{Kiểm thử tự động}
+Bộ 15 kiểm thử (pytest) chạy trên MySQL thật, tất cả đạt: \emph{logic dimension} (3: ranh giới huyết áp ACC/AHA, nhóm BMI/tuổi, junk dimension); \emph{kho dữ liệu} (4: toàn vẹn tham chiếu 10 dimension, view và bảng phẳng không mất/nhân đôi dòng, \code{fact_nutrition} là tập con, giá trị trong khoảng sinh lý); \emph{OLAP} (4: tổng roll-up khớp, slice đúng và từ chối tên chiều độc hại, CVD tăng đơn điệu theo tuổi, drill-down khớp cha--con); \emph{DSS} (4: AUC, Brier và nguy cơ tăng theo tuổi; can thiệp không làm tăng nguy cơ và đơn điệu; phân bổ không vượt ngân sách và không kém chia đều; cảnh báo sắp xếp đúng). Năm trang dashboard (13 màn hình con) đã được mở trên trình duyệt thật và không có lỗi.
+
+\section{Thành tựu}
+\begin{itemize}
+\item Kho dữ liệu đa chiều tích hợp hai nguồn NHANES: 38.612 bản ghi khám, 12.505 bản ghi dinh dưỡng, 10 dimension (5 dùng chung), 2 bảng fact, ETL có ghi nhật ký.
+\item OLAP đầy đủ slice, dice, roll-up, drill-down, pivot, cube, cùng 22 truy vấn mẫu chạy được trên MySQL Workbench.
+\item DSS bốn chức năng; trong kịch bản minh họa, ưu tiên đúng nhóm tránh được 348 ca so với 87 ca khi chia đều (cùng ngân sách, cùng 6.667 người được phủ).
+\item Phát hiện và xử lý một vấn đề phương pháp quan trọng (nhiễu điều trị làm hệ số cholesterol sai dấu) bằng thiết kế thay vì che giấu.
+\item Xử lý một nút thắt hiệu năng đặc thù của MySQL (lập kế hoạch join nhiều bảng) bằng bảng phẳng lưu sẵn.
+\end{itemize}
+
+\section{Hạn chế}\label{sec:limits}
+\begin{itemize}
+\item \textbf{Nhãn bệnh tự khai báo, cắt ngang:} mô hình ước lượng tỷ lệ hiện mắc, không dự báo biến cố và không chứng minh nhân quả.
+\item \textbf{Nhiễu do điều trị chưa hiệu chỉnh:} hai nguồn không có dữ liệu thuốc nên huyết áp và cholesterol không đóng góp đúng chiều trong mô hình; tác động can thiệp dựa vào RR trong y văn (tham số BMI là giả định minh họa).
+\item \textbf{Chưa gia quyền khảo sát và chưa chuẩn hóa tuổi:} tỷ lệ là tỷ lệ mẫu, không phải ước lượng cho toàn dân số; so sánh giữa chủng tộc, thu nhập chưa hiệu chỉnh tuổi; kiểm định $z$ chưa tính thiết kế mẫu phức hợp.
+\item \textbf{Chu kỳ chồng lấn và thiếu thuộc tính:} ``2017--2018'' (nguồn A) chồng lấn ``2017--03/2020'' (nguồn B); nguồn B không có giới, chủng tộc, thu nhập nên bị loại khỏi các phân tích theo các chiều đó và khỏi huấn luyện mô hình.
+\item \textbf{Quy mô và vận hành:} MySQL hướng hàng phù hợp quy mô hàng chục nghìn dòng; dữ liệu lớn hơn cần kho dạng cột/đám mây, nạp tăng dần, SCD; dashboard chưa có phân quyền người dùng.
+\end{itemize}
+
+\section{So sánh với mục tiêu}
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Mức độ đạt các mục tiêu của dự án}
+\small
+\begin{tabularx}{\textwidth}{|X|p{2.2cm}|}
+\hline
+\textbf{Mục tiêu (Mục 2.4.1)} & \textbf{Mức độ} \\ \hline
+Kho dữ liệu đa chiều tích hợp hai nguồn, ETL chạy lại được, có nhật ký & Hoàn thành \\ \hline
+OLAP và dashboard trả lời Q1--Q4, Q9 & Hoàn thành \\ \hline
+DSS trả lời Q5--Q8 dựa trên kho & Hoàn thành \\ \hline
+Đánh giá trung thực, nêu giả định và hạn chế & Hoàn thành \\ \hline
+\end{tabularx}
+\end{table}

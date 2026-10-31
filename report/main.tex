@@ -1,0 +1,81 @@
+% !TEX program = xelatex
+% Biên dịch:  cd report ; xelatex main ; xelatex main   (chạy 2 lần để có mục lục)
+\documentclass[11pt,a4paper]{report}
+
+\usepackage{fontspec}
+\setmainfont{Times New Roman}
+\setmonofont{Consolas}[Scale=0.88]
+% Không dùng babel: gói tiếng Việt của MiKTeX không có sẵn mẫu ngắt từ (gây cảnh báo), mà tiếng Việt
+% vốn không ngắt từ giữa âm tiết. Tên các mục được đặt tay bên dưới.
+\hyphenpenalty=10000 \exhyphenpenalty=10000
+\tolerance=1500 \emergencystretch=3em
+\hbadness=10000 \vbadness=10000  % không báo "Underfull" ở các ô bảng hẹp (không ảnh hưởng hiển thị)
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\listfigurename}{Danh sách hình vẽ}
+\renewcommand{\listtablename}{Danh sách bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\chaptername}{Chương}
+\renewcommand{\bibname}{Tài liệu tham khảo}
+\renewcommand{\appendixname}{Phụ lục}
+\usepackage[a4paper,top=3.1cm,bottom=2.5cm,left=2.7cm,right=2.3cm,headheight=1.15cm,headsep=0.5cm,footskip=1.0cm]{geometry}
+\usepackage{setspace}
+\setstretch{1.12}
+\usepackage{graphicx}
+\usepackage{booktabs,tabularx,longtable,array,multirow}
+\usepackage{xcolor}
+\usepackage{enumitem}
+\setlist{itemsep=1pt,topsep=3pt,parsep=0pt}
+\usepackage{amsmath,amssymb}
+\usepackage{float}
+\usepackage{caption}
+\captionsetup{font=small,labelfont=bf}
+\usepackage{fancyhdr}
+\usepackage{lastpage}
+\usepackage{titlesec}
+\usepackage{listings}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,shapes.multipart,fit,calc,backgrounds}
+\usepackage{pdflscape}
+\usepackage[hidelinks]{hyperref}
+
+\definecolor{codebg}{RGB}{245,245,242}
+\definecolor{accent}{RGB}{42,120,214}
+\lstset{
+  basicstyle=\ttfamily\small, backgroundcolor=\color{codebg}, frame=single, rulecolor=\color{black!15},
+  breaklines=true, columns=fullflexible, keepspaces=true, showstringspaces=false,
+  keywordstyle=\color{accent}\bfseries, commentstyle=\color{black!55}\itshape,
+  morekeywords={WITH,ROLLUP,STRAIGHT_JOIN,ANALYZE,MATERIALIZED}
+}
+\newcommand{\code}[1]{\texttt{\detokenize{#1}}}
+\newcommand{\placeholder}[1]{\textcolor{red}{\textbf{[#1]}}}
+
+% Đầu trang giống bài mẫu: logo BK + hai dòng tên trường/khoa; chân trang: tên môn và số trang x/N
+\newcommand{\hdrtext}{\parbox[c]{9cm}{\rmfamily\small Ho Chi Minh City University of Technology\\Faculty of Computer Science and Engineering}}
+\fancypagestyle{plain}{%
+  \fancyhf{}
+  \fancyhead[L]{\raisebox{-0.17cm}[0pt][0pt]{\includegraphics[height=0.72cm]{image.png}}\hspace{4pt}\hdrtext}
+  \fancyfoot[L]{\ttfamily\scriptsize CO4031 -- Kho dữ liệu và Hệ hỗ trợ quyết định -- HK261}
+  \fancyfoot[R]{\ttfamily\scriptsize Trang \thepage/\pageref{LastPage}}
+  \renewcommand{\headrulewidth}{0.3pt}
+  \renewcommand{\footrulewidth}{0.3pt}}
+\pagestyle{plain}
+\titleformat{\chapter}[hang]{\Large\bfseries}{\thechapter.}{0.6em}{}
+\titlespacing*{\chapter}{0pt}{-10pt}{14pt}
+
+\begin{document}
+\input{chapters/00_cover}
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+
+\input{chapters/01_gioi_thieu}
+\input{chapters/02_bai_toan}
+\input{chapters/03_giai_phap}
+\input{chapters/04_etl}
+\input{chapters/05_ung_dung}
+\input{chapters/06_danh_gia}
+\input{chapters/07_ket_luan}
+\input{chapters/08_tai_lieu}
+\end{document}

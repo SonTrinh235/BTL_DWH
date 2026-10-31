@@ -1,0 +1,37 @@
+\chapter{Kết luận}\label{ch:conclusion}
+
+\section{Tóm tắt}
+Đề tài đã xây dựng hệ thống hoàn chỉnh từ dữ liệu thô đến quyết định: hai nguồn NHANES (24 file XPT và 1 file CSV, 2011--2023) được tích hợp bằng ETL có ghi nhật ký vào kho dữ liệu đa chiều MySQL (2 bảng fact, 10 dimension, 38.612 bản ghi khám và 12.505 bản ghi dinh dưỡng); tầng OLAP và dashboard cho phép khám phá đa chiều; và thành phần DSS với bốn chức năng -- đánh giá nguy cơ cá nhân, what-if, phân bổ ngân sách tối ưu, cảnh báo xu hướng -- trả lời câu hỏi cốt lõi: \emph{can thiệp vào nhóm dân số nào để tránh được nhiều ca bệnh tim mạch nhất với ngân sách hữu hạn}.
+
+\section{Bài học kinh nghiệm}
+\begin{itemize}
+\item \textbf{Dữ liệu ``sạch'' vẫn cần giải mã:} phần lớn công sức ETL nằm ở việc hiểu mã hóa và quy ước (mã 7/9, huyết áp bằng 0, chu kỳ chồng lấn, trung bình các lần đo); sai ở tầng này lan ra mọi số liệu phía sau.
+\item \textbf{Mô hình đúng thống kê chưa chắc dùng được:} mô hình bảy đặc trưng có AUC cao hơn nhưng hệ số cholesterol sai dấu y học; kiểm tra hệ số, không chỉ AUC, giúp tránh khuyến nghị sai.
+\item \textbf{Hiệu năng phải đo, không đoán:} truy vấn chậm do lập kế hoạch join 11 bảng chứ không phải do thực thi; \code{EXPLAIN ANALYZE} và thí nghiệm chỉ ra giải pháp.
+\item \textbf{Trung thực về giới hạn} (không nhân quả, không dự báo, chưa gia quyền) làm tăng độ tin cậy của hệ thống.
+\end{itemize}
+
+\section{Hướng phát triển}
+\begin{enumerate}
+\item \textbf{Hiệu chỉnh nhiễu do điều trị:} đưa bảng thuốc, tiểu đường, hút thuốc từ bộ NHANES 2013--2014 dạng rộng vào kho (thêm dimension) để mô hình dùng được huyết áp và cholesterol đúng chiều.
+\item \textbf{Gia quyền khảo sát và chuẩn hóa tuổi:} dùng \code{mec_weight} và cụm/tầng mẫu để ước lượng tỷ lệ và khoảng tin cậy cho toàn dân số.
+\item \textbf{Dự báo biến cố:} liên kết dữ liệu tử vong (NHANES Linked Mortality) để mô hình theo thời gian thay cho hiện mắc.
+\item \textbf{Tối ưu mạnh hơn:} nhiều ràng buộc (nhân lực, độ phủ tối thiểu vì công bằng), đa mục tiêu, phân tích độ nhạy tự động theo tham số RR.
+\item \textbf{Kiến trúc và vận hành:} vùng staging trong CSDL, nạp tăng dần, SCD; kho dạng cột (ClickHouse, BigQuery) khi dữ liệu lớn; phân quyền, tài khoản chỉ đọc riêng, lập lịch ETL.
+\end{enumerate}
+
+\section{Phân công công việc}
+Phần này do nhóm điền theo đóng góp thực tế; cột vai trò dưới đây là gợi ý theo các module của hệ thống.
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Phân công công việc}
+\small
+\begin{tabularx}{\textwidth}{|p{3.4cm}|p{2cm}|X|}
+\hline
+\textbf{Thành viên} & \textbf{MSSV} & \textbf{Vai trò và công việc} \\ \hline
+Trịnh Đức Sơn & 2353056 & \placeholder{Điền vai trò thực tế. Gợi ý: thiết kế kho dữ liệu và ETL (schema.sql, extract/transform/load), tầng OLAP và truy vấn mẫu; viết Chương 3 (mô hình dữ liệu) và 4} \\ \hline
+Vũ Thị Kiều Trang & 2313523 & \placeholder{Điền vai trò thực tế. Gợi ý: dashboard, thành phần DSS (mô hình nguy cơ, what-if, tối ưu, cảnh báo), kiểm thử; viết Chương 1, 2, 3 (DSS), 5, 6, 7} \\ \hline
+\end{tabularx}
+\end{table}
+Tất cả thành viên cùng tham gia thuyết trình (trực tiếp hoặc trong video), chia phần theo các vai trò trên.

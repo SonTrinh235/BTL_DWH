@@ -1,0 +1,10 @@
+pandas>=2.2
+numpy
+sqlalchemy>=2.0
+pymysql
+cryptography
+scikit-learn>=1.4
+joblib
+streamlit>=1.40
+plotly>=5.20
+pytest

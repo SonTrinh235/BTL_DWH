@@ -1,0 +1,82 @@
+\chapter{Giới thiệu}
+
+\section{Bối cảnh và động lực}
+Bệnh tim mạch (cardiovascular disease -- CVD) là nhóm bệnh gây tử vong hàng đầu thế giới; theo Tổ chức Y tế Thế giới, mỗi năm có khoảng 17,9 triệu ca tử vong do CVD \cite{who_cvd}. Phần lớn yếu tố nguy cơ -- tăng huyết áp, rối loạn mỡ máu, thừa cân béo phì -- có thể được phát hiện sớm và kiểm soát. Tuy nhiên, các cơ quan y tế công cộng chỉ có ngân sách hữu hạn, nên câu hỏi thực tế không chỉ là ``tình hình ra sao'' mà còn là ``nên can thiệp ở nhóm dân số nào trước''.
+
+Dữ liệu để trả lời các câu hỏi này đã có sẵn dưới dạng những cuộc khảo sát sức khỏe quy mô lớn. Tuy vậy, phần lớn dữ liệu vẫn chưa được khai thác hiệu quả vì bị phân mảnh thành nhiều file theo từng chu kỳ và loại xét nghiệm, được mã hóa bằng các biến kỹ thuật (ví dụ \code{BPXSY1}, \code{RIDRETH1}) và chứa nhiều giá trị thiếu hoặc mã đặc biệt. Người phân tích thường phải tự ghép nối, làm sạch và tính lại các chỉ số mỗi khi cần trả lời một câu hỏi mới bằng bảng tính hoặc mã tạm thời, khiến việc nhận diện xu hướng và ra quyết định chậm và dễ sai sót.
+
+Sự phát triển của Business Intelligence (BI) và Hệ hỗ trợ quyết định (DSS), dựa trên nền tảng kho dữ liệu, đã thay đổi cách các tổ chức -- kể cả cơ quan y tế -- khai thác dữ liệu: dữ liệu được tích hợp, chuẩn hóa và trình bày cho người ra quyết định dưới dạng tương tác. Đề tài này áp dụng BI và các công nghệ liên quan vào lĩnh vực \emph{phân tích nguy cơ bệnh tim mạch}, minh họa cách một quy trình dữ liệu có cấu trúc, kho dữ liệu đa chiều, dashboard tương tác và mô hình hỗ trợ quyết định có thể giúp phân bổ nguồn lực phòng bệnh dựa trên bằng chứng.
+
+\section{Khái niệm và định nghĩa chính}
+
+\subsection{Business Intelligence (BI)}
+Business Intelligence là tập hợp công nghệ, quy trình và chiến lược dùng để thu thập, tích hợp, phân tích và trình bày dữ liệu. Mục tiêu chính của BI là hỗ trợ ra quyết định tốt hơn bằng cách biến dữ liệu thô thành thông tin có ý nghĩa và dùng được \cite{han2012}. Các đặc điểm của BI:
+\begin{itemize}
+\item \textbf{Tích hợp dữ liệu (Data Integration):} kết hợp dữ liệu từ nhiều nguồn thành một cái nhìn thống nhất.
+\item \textbf{Phân tích mô tả và chẩn đoán:} trả lời ``điều gì đã xảy ra?'' và ``vì sao nó xảy ra?''.
+\item \textbf{Báo cáo tương tác:} dashboard, thẻ KPI và báo cáo đặc thù để người dùng tự khám phá dữ liệu bằng hình ảnh.
+\item \textbf{Phân tích lịch sử:} hỗ trợ phân tích xu hướng qua các giai đoạn.
+\end{itemize}
+\emph{Ví dụ:} một dashboard BI theo dõi tỷ lệ mắc CVD theo nhóm tuổi cho thấy nhóm 60--69 tuổi có tỷ lệ 17,1\%, cao hơn rõ so với mức trung bình toàn bộ mẫu là 11,7\%. Khoan sâu (drill-down) theo phân loại BMI, nhà phân tích thấy trong cùng nhóm tuổi này tỷ lệ lên tới 25,3\% ở người béo phì độ III so với 15,1\% ở người có BMI bình thường, từ đó đặt câu hỏi về chương trình kiểm soát cân nặng.
+
+\subsection{Hệ hỗ trợ quyết định (DSS)}
+Hệ hỗ trợ quyết định (Decision Support System -- DSS) là hệ thống tương tác dựa trên máy tính, giúp người ra quyết định dùng dữ liệu và mô hình để giải quyết các bài toán bán cấu trúc và phi cấu trúc \cite{turban2005,sharda2020}. Khác với hệ thống giao dịch tập trung vào hoạt động hằng ngày, DSS cung cấp năng lực phân tích phục vụ quyết định cấp quản lý. Các đặc điểm của DSS:
+\begin{itemize}
+\item \textbf{Dựa trên mô hình hoặc dựa trên dữ liệu:} dựa trên mô hình toán học/thống kê hoặc trên các kho dữ liệu lớn.
+\item \textbf{Tương tác và linh hoạt:} người dùng truy vấn, lọc, điều chỉnh tham số để khám phá các kịch bản.
+\item \textbf{Hỗ trợ (không thay thế) phán đoán của con người:} DSS cung cấp phương án và bằng chứng, quyết định cuối cùng thuộc về người ra quyết định.
+\item \textbf{Giải quyết bài toán bán cấu trúc:} một phần có thể tự động hóa nhưng vẫn cần chuyên môn của con người.
+\end{itemize}
+Quá trình ra quyết định thường được mô tả qua ba giai đoạn của Simon \cite{simon1960}: \emph{intelligence} (nhận diện vấn đề), \emph{design} (xây dựng các phương án) và \emph{choice} (chọn phương án).
+
+\emph{Ví dụ:} một nhà quản lý y tế công cộng dùng DSS để quyết định cách phân bổ 2 triệu USD cho chương trình sàng lọc tim mạch. Hệ thống phân tích nguy cơ nền của từng phân khúc dân số (nhóm tuổi $\times$ tình trạng huyết áp), mô phỏng hiệu quả can thiệp và đề xuất ưu tiên người từ 70 tuổi có tăng huyết áp, tránh được khoảng 348 ca so với 87 ca nếu chia đều ngân sách.
+
+\subsection{Kho dữ liệu (Data Warehouse -- DW)}
+Kho dữ liệu là kho lưu trữ tập trung, tích hợp dữ liệu từ nhiều nguồn, được tối ưu cho truy vấn và báo cáo phân tích thay vì xử lý giao dịch \cite{inmon2005,kimball2013}. Nó là nền tảng cho cả BI và DSS vì cung cấp kho dữ liệu nhất quán, sạch và có lịch sử. Các đặc điểm của kho dữ liệu:
+\begin{itemize}
+\item \textbf{Hướng chủ đề (Subject-oriented):} tổ chức quanh các chủ đề chính (ví dụ lượt khám, khẩu phần ăn) thay vì theo ứng dụng.
+\item \textbf{Tích hợp (Integrated):} dữ liệu từ các nguồn khác nhau được làm sạch và thống nhất mã hóa, định dạng.
+\item \textbf{Biến thiên theo thời gian (Time-variant):} lưu lịch sử để phân tích xu hướng (ở đây là sáu chu kỳ khảo sát).
+\item \textbf{Không thay đổi (Non-volatile):} dữ liệu đã nạp không bị sửa tại chỗ, bảo đảm tính nhất quán của báo cáo.
+\end{itemize}
+
+\subsection{Xử lý phân tích trực tuyến (OLAP)}
+OLAP là nhóm công nghệ cho phép nhà phân tích và nhà quản lý khai thác thông tin thông qua truy cập nhanh, nhất quán và tương tác vào nhiều góc nhìn khác nhau của dữ liệu \cite{kimball2013,han2012}. OLAP hỗ trợ các phép toán:
+\begin{itemize}
+\item \textbf{Slice và Dice:} nhìn dữ liệu từ nhiều góc độ (ví dụ theo giới tính, theo nhóm tuổi, theo chu kỳ).
+\item \textbf{Drill-down / Roll-up:} chuyển giữa các mức chi tiết (ví dụ từ giai đoạn đời xuống nhóm tuổi 10 năm).
+\item \textbf{Pivot:} xoay các trục dữ liệu để so sánh các chiều với nhau.
+\end{itemize}
+
+\section{So sánh BI và DSS}
+BI và DSS có liên quan chặt chẽ và thường chồng lấn trong thực tế, nhưng khác nhau về phạm vi, trọng tâm và cách ứng dụng. Bảng~\ref{tab:bi_dss} tóm tắt các khác biệt chính.
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{So sánh Business Intelligence (BI) và Decision Support Systems (DSS)}\label{tab:bi_dss}
+\small
+\begin{tabularx}{\textwidth}{|p{2.7cm}|X|X|}
+\hline
+\textbf{Tiêu chí} & \textbf{Business Intelligence (BI)} & \textbf{Decision Support Systems (DSS)} \\ \hline
+Mục đích chính & Theo dõi và báo cáo hiệu quả hoạt động của tổ chức & Hỗ trợ các quá trình ra quyết định cụ thể \\ \hline
+Trọng tâm & Phân tích mô tả (điều gì đã xảy ra? vì sao?) & Phân tích dự báo/đề xuất (nên làm gì?) \\ \hline
+Người dùng & Nhiều đối tượng: lãnh đạo, quản lý, nhà phân tích & Chủ yếu nhà quản lý và người ra quyết định \\ \hline
+Cách tiếp cận dữ liệu & Dựa trên dữ liệu (dashboard, báo cáo, KPI) & Dựa trên mô hình hoặc dựa trên dữ liệu (what-if, mô phỏng) \\ \hline
+Tính tương tác & Khám phá qua bộ lọc, drill-down, slicer & Phân tích kịch bản, điều chỉnh tham số \\ \hline
+Đầu ra & Báo cáo, dashboard, cảnh báo & Khuyến nghị, các phương án thay thế \\ \hline
+Phạm vi & Giám sát toàn tổ chức & Hỗ trợ một bài toán cụ thể \\ \hline
+Nền tảng công nghệ & DW, ETL, OLAP, công cụ trực quan hóa & DW, mô hình, thuật toán tối ưu \\ \hline
+Công cụ ví dụ & Power BI, Tableau, Looker & Ứng dụng phân tích tùy biến, Excel Solver \\ \hline
+\end{tabularx}
+\end{table}
+\textbf{Mối quan hệ trong đề tài.} Hệ thống đóng vai trò vừa là nền tảng BI vừa là DSS dựa trên dữ liệu. Các trang dashboard (Tổng quan, OLAP Explorer, Phân tích yếu tố nguy cơ) cung cấp năng lực BI: theo dõi KPI, trực quan hóa xu hướng, so sánh các nhóm. Trang hỗ trợ quyết định cùng khả năng drill-down hỗ trợ chức năng DSS: tìm nguyên nhân, mô phỏng can thiệp và phân bổ nguồn lực. Kho dữ liệu MySQL là nền tảng chung cho cả hai.
+
+\section{Các công nghệ liên quan}
+\begin{itemize}
+\item \textbf{ETL (Extract, Transform, Load):} quá trình trích xuất dữ liệu từ các hệ thống nguồn, biến đổi về định dạng nhất quán rồi nạp vào kho dữ liệu. Trong đề tài, ETL được viết bằng Python với thư viện pandas (đọc file SAS/CSV, làm sạch, tích hợp, sinh khóa dimension) và nạp vào MySQL qua SQLAlchemy.
+\item \textbf{Star Schema:} kỹ thuật mô hình hóa đa chiều trong đó một bảng fact trung tâm được bao quanh bởi các bảng dimension; thiết kế này tối ưu hiệu năng truy vấn cho khối lượng công việc OLAP. Đề tài dùng biến thể \emph{fact constellation} với hai bảng fact dùng chung các dimension.
+\item \textbf{Hệ quản trị cơ sở dữ liệu quan hệ cho kho dữ liệu (MySQL):} hệ quản trị CSDL quan hệ mã nguồn mở hỗ trợ SQL, khóa ngoại và chỉ mục để bảo đảm toàn vẹn và tăng tốc truy vấn; MySQL 8.0 có thêm CTE, window function và \code{WITH ROLLUP} phục vụ truy vấn phân tích. Đây là nơi lưu kho dữ liệu của đề tài.
+\item \textbf{Dashboard tương tác (Streamlit, Plotly):} công cụ xây dựng ứng dụng dữ liệu tương tác bằng Python, kết nối trực tiếp với nguồn dữ liệu và cho phép lọc, drill-down và trực quan hóa tự phục vụ. Đề tài dùng chúng để hiện thực dashboard, OLAP Explorer và trang DSS.
+\item \textbf{Mô hình dự báo nguy cơ (Machine Learning):} mô hình thống kê học từ dữ liệu quá khứ để ước lượng xác suất xảy ra một sự kiện; logistic regression cho xác suất có thể diễn giải được. Đề tài dùng nó (qua scikit-learn) để ước lượng nguy cơ CVD làm đầu vào cho mô phỏng can thiệp.
+\item \textbf{Tối ưu hóa phân bổ nguồn lực:} nhóm phương pháp toán học chọn phương án tốt nhất dưới các ràng buộc; đề tài dùng bài toán knapsack phân số (thuật toán tham lam) để chọn phân khúc dân số ưu tiên với ngân sách hữu hạn.
+\end{itemize}

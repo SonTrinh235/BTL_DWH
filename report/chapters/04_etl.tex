@@ -1,0 +1,154 @@
+\chapter{Extract -- Transform -- Load (ETL)}\label{ch:etl}
+
+\section{Mục tiêu}
+Mục tiêu của quy trình này là trích xuất dữ liệu khảo sát sức khỏe thô và biến đổi chúng về một định dạng báo cáo chuẩn hóa, nạp vào kho dữ liệu MySQL. Quy trình đáp ứng ba yêu cầu: \emph{chạy lại được} bằng một lệnh (\code{python -m src.etl.run_etl}) và cho cùng kết quả; \emph{truy vết được}: mọi bước lọc/loại bỏ đều ghi số dòng vào bảng \code{etl_log}; \emph{không âm thầm làm mất dữ liệu}: giá trị bất thường chuyển thành NULL và được đếm, bản ghi thiếu thuộc tính được giữ lại với thành viên Unknown.
+
+Bộ dữ liệu cuối cùng (bảng phẳng \code{olap_exam}, 49 cột) gồm các nhóm cột sau:
+\begin{enumerate}
+\item \textbf{Định danh và thời gian:} \code{exam_id}, \code{cycle_label}, \code{period_group}, \code{source_system}.
+\item \textbf{Nhân khẩu học:} \code{sex}, \code{race}, \code{race_group}, \code{education}, \code{education_level}, \code{income_band}, \code{age_years}, \code{age_group}, \code{life_stage}.
+\item \textbf{Chỉ số cơ thể và huyết áp:} \code{sbp}, \code{dbp}, \code{pulse}, \code{bmi}, \code{waist_cm}, \code{weight_kg}, \code{height_cm}, \code{bmi_category}, \code{weight_status}, \code{bp_category}, \code{bp_group}.
+\item \textbf{Xét nghiệm:} \code{total_chol}, \code{hdl_chol}, \code{non_hdl_chol}, \code{crp_mgl}, \code{chol_category}.
+\item \textbf{Bệnh tim mạch:} \code{profile_label}, \code{cvd_group}, \code{n_conditions} và các cờ \code{has_cvd}, \code{is_hypertensive}, \code{is_obese}, \code{is_high_chol}, \code{is_low_hdl}.
+\item \textbf{Khác:} \code{income_ratio}, \code{mec_weight} và 10 khóa dimension (\code{cycle_key}\ldots\code{cvd_profile_key}).
+\end{enumerate}
+Dữ liệu dinh dưỡng được nạp riêng vào bảng \code{fact_nutrition} (14 chỉ số và 2 cờ).
+
+\section{Nguồn dữ liệu và thông tin}
+Cả hai nguồn đều xuất phát từ NHANES -- khảo sát sức khỏe và dinh dưỡng quốc gia của CDC/NCHS (Hoa Kỳ), thực hiện theo chu kỳ hai năm trên mẫu đại diện dân số \cite{nhanes}. Người tham gia được phỏng vấn tại nhà rồi khám tại trung tâm khám lưu động (đo huyết áp, nhân trắc, xét nghiệm máu). Dữ liệu mở, chia theo thành phần và gắn với nhau bằng mã người tham gia \code{SEQN}.
+
+\subsection{Nguồn A: NHANES 2011--2018 (file SAS transport \code{.XPT})}
+\begin{itemize}
+\item \textbf{URL:} trang dữ liệu \code{https://wwwn.cdc.gov/nchs/nhanes/}; file tải trực tiếp theo mẫu \code{https://wwwn.cdc.gov/Nchs/Data/Nhanes/Public/<năm>/DataFiles/<TÊN>_<hậu tố>.XPT}, ví dụ \code{.../Public/2011/DataFiles/DEMO_G.XPT} (hậu tố G, H, I, J ứng với các chu kỳ 2011--2012, 2013--2014, 2015--2016, 2017--2018).
+\item \textbf{Quy mô:} 24 file = 6 thành phần $\times$ 4 chu kỳ. Số dòng sau khi gộp bốn chu kỳ: DEMO 39.156; BMX và BPX 37.399; HDL và TCHOL 31.568; MCQ 37.606.
+\item \textbf{Các cột sử dụng} (trên tổng số cột của từng thành phần):
+\begin{enumerate}
+\item \textbf{DEMO} (nhân khẩu học): \code{SEQN} -- mã người tham gia; \code{RIAGENDR} -- giới tính (1 nam, 2 nữ); \code{RIDAGEYR} -- tuổi khi khảo sát (từ 80 trở lên được gộp thành 80); \code{RIDRETH1} -- chủng tộc/nguồn gốc (1 Mexican American, 2 Other Hispanic, 3 Non-Hispanic White, 4 Non-Hispanic Black, 5 khác); \code{DMDEDUC2} -- học vấn của người $\geq$ 20 tuổi (1--5, mã 7 và 9 là từ chối/không biết); \code{INDFMPIR} -- tỷ lệ thu nhập hộ gia đình trên ngưỡng nghèo (PIR, 0--5); \code{WTMEC2YR} -- trọng số khám MEC.
+\item \textbf{BPX} (huyết áp): \code{BPXSY1}--\code{BPXSY4} -- huyết áp tâm thu lần đo 1--4 (mmHg); \code{BPXDI1}--\code{BPXDI4} -- huyết áp tâm trương lần đo 1--4; \code{BPXPLS} -- mạch 60 giây.
+\item \textbf{BMX} (nhân trắc): \code{BMXBMI} -- BMI (kg/m$^2$); \code{BMXWAIST} -- vòng eo (cm); \code{BMXWT} -- cân nặng (kg); \code{BMXHT} -- chiều cao (cm).
+\item \textbf{HDL, TCHOL} (xét nghiệm máu): \code{LBDHDD} -- HDL cholesterol (mg/dL); \code{LBXTC} -- cholesterol toàn phần (mg/dL).
+\item \textbf{MCQ} (bệnh tật tự khai báo, hỏi người $\geq$ 20 tuổi): \code{MCQ160B} -- suy tim; \code{MCQ160C} -- bệnh mạch vành; \code{MCQ160D} -- đau thắt ngực; \code{MCQ160E} -- nhồi máu cơ tim; \code{MCQ160F} -- đột quỵ (mã: 1 có, 2 không, 7/9 từ chối/không biết).
+\end{enumerate}
+\end{itemize}
+
+\subsection{Nguồn B: Nhanes\_cvd\_raw.csv (2017--2023)}
+\begin{itemize}
+\item \textbf{Nguồn:} bản tổng hợp dạng CSV của dữ liệu NHANES 2017--2023 (dữ liệu gốc của CDC \cite{nhanes}), tải từ một bản mirror công khai trên Kaggle \placeholder{dán URL trang Kaggle của file Nhanes\_cvd\_raw.csv}.
+\item \textbf{Quy mô:} 27.493 dòng $\times$ 47 cột; mỗi dòng là một người tham gia.
+\item \textbf{Các cột sử dụng:}
+\begin{enumerate}
+\item \code{SEQN}: mã người tham gia; từ đây suy ra chu kỳ (mục 4.4.2).
+\item \textbf{Dinh dưỡng 24 giờ (13 cột):} \code{Protein}, \code{Carbohydrates}, \code{Sugars}, \code{Fiber}, \code{Saturated_Fat}, \code{Monounsaturated_Fat}, \code{Polyunsaturated_Fat}, \code{Cholesterol} (cholesterol ăn vào), \code{Sodium}, \code{Potassium}, \code{Calcium}, \code{Magnesium}, \code{Vitamin_D}.
+\item \textbf{Bệnh tim mạch tự khai báo (5 cột):} \code{Congestive}, \code{Coronary}, \code{Heart_attack}, \code{Stroke}, \code{Angina} (cùng mã 1/2/7/9 như MCQ160).
+\item \textbf{Chỉ số cơ thể và xét nghiệm (7 cột):} \code{Age}, \code{BMI}, \code{Waist_circ}, \code{Systolic_BP}, \code{Diastolic_BP}, \code{Total_Colesterol} (tên gốc viết sai chính tả), \code{C_Reactive} (CRP, mg/L).
+\item \textbf{Không dùng (21 cột):} các vi chất (\code{Beta_Carotene}, \code{Thiamin}, \code{Iron}, \code{Zinc}\ldots) và \code{Moisture}, không liên quan trực tiếp đến câu hỏi nghiệp vụ.
+\end{enumerate}
+\end{itemize}
+Nguồn B không có giới tính, chủng tộc, học vấn, thu nhập; nguồn A không có dinh dưỡng và CRP. Hai nguồn bổ sung cho nhau: kho cuối có \textbf{38.612} bản ghi khám và \textbf{12.505} bản ghi dinh dưỡng.
+
+\subsection{Các bộ dữ liệu khác đã khảo sát}
+Nhóm cũng đánh giá các bộ dữ liệu sẵn có từ đồ án trước: \code{nhanes_cardio.csv} (22.616 dòng $\times$ 11 cột; bản tổng hợp sẵn từ nguồn A nên mất thông tin), \code{cardio_train.csv} (70.000 dòng $\times$ 13 cột; một bảng phẳng không có chiều thời gian), \code{framingham.csv} (4.240 dòng) và \code{heart_disease_uci.csv} (920 dòng) quá nhỏ hoặc nghèo chiều. Bộ NHANES 2013--2014 dạng rộng (6 file) chỉ có một chu kỳ, trùng chu kỳ đã có ở nguồn A, nhưng có bảng thuốc -- là hướng phát triển ở Chương~\ref{ch:conclusion}.
+
+\section{Extract -- Trích xuất dữ liệu}
+Giai đoạn trích xuất đọc dữ liệu thô từ các file nguồn vào môi trường làm việc (staging) để xử lý, và không thay đổi file gốc nên dữ liệu nguồn luôn nguyên vẹn trước khi biến đổi. Các file được đặt trong \code{data/raw/} và đọc bằng thư viện pandas: file \code{.XPT} bằng \code{pandas.read_sas}, file CSV bằng \code{pandas.read_csv}. Với nguồn A, sáu thành phần của bốn chu kỳ được đọc, gắn thêm cột mã chu kỳ rồi gộp theo từng thành phần thành sáu DataFrame (\code{DEMO}, \code{BMX}, \code{BPX}, \code{HDL}, \code{TCHOL}, \code{MCQ}); nguồn B là một DataFrame duy nhất.
+\begin{lstlisting}[language=Python]
+for table in ["DEMO", "BMX", "BPX", "HDL", "TCHOL", "MCQ"]:
+    frames = [pd.read_sas(f"{table}_{code}.XPT", format="xport")
+              for code in ["G", "H", "I", "J"]]          # 4 chu ky 2011-2018
+    raw[table] = pd.concat(frames)                        # gop thanh 1 bang
+cvd_csv = pd.read_csv("Nhanes_cvd_raw.csv")               # nguon B
+\end{lstlisting}
+
+\section{Transform -- Biến đổi}
+\subsection{Nguồn A: NHANES XPT}
+\begin{itemize}
+\item \textbf{Làm sạch dữ liệu (Data Cleaning):}
+\begin{itemize}
+\item \textbf{Mã Có/Không (MCQ160B--F):} dữ liệu gốc dùng mã 1 (có), 2 (không), 7 (từ chối), 9 (không biết). Mã 7, 9 và ô trống không được coi là ``Không'' mà chuyển thành NULL; 1 $\rightarrow$ 1, 2 $\rightarrow$ 0 (ví dụ SEQN 73557: \code{MCQ160F} = 1 $\rightarrow$ \code{stroke} = 1).
+\item \textbf{Huyết áp tâm trương bằng 0:} là mã lỗi đo, bị loại (chuyển thành NULL) trước khi tính trung bình.
+\item \textbf{Học vấn và chủng tộc:} mã học vấn 7 và 9 chuyển thành thành viên \emph{Unknown} (khóa 0); \code{RIDRETH1} được ánh xạ sang năm nhóm có tên (ví dụ 4 $\rightarrow$ Non-Hispanic Black).
+\item \textbf{Giá trị ngoài khoảng sinh lý:} chuyển thành NULL và ghi nhật ký: DBP ngoài [20, 150] mmHg (125 giá trị), BMI ngoài [10, 80] (5), cholesterol toàn phần ngoài [70, 500] mg/dL (8), HDL ngoài [10, 150] (13).
+\end{itemize}
+\item \textbf{Xử lý dữ liệu (Data Processing):}
+\begin{itemize}
+\item \textbf{Lọc đối tượng:} chỉ giữ người $\geq$ 20 tuổi (39.156 $\rightarrow$ 22.617), vì bộ câu hỏi bệnh tim mạch chỉ hỏi người lớn; bỏ người không được khám MEC (thiếu cả huyết áp và BMI) $\rightarrow$ 21.572.
+\item \textbf{Huyết áp (sbp, dbp):} các cột này không có sẵn; mỗi người có tối đa bốn lần đo. Theo quy ước của CDC, lần đo đầu thường cao hơn nên bị bỏ: lấy trung bình các lần 2--4, nếu chỉ có lần 1 thì dùng lần 1. Ví dụ SEQN 93705: \code{BPXSY1--4} = (NaN, NaN, 202, 198) $\rightarrow$ \code{sbp} = 200; SEQN 73557: (122, 114, 102) $\rightarrow$ \code{sbp} = 108.
+\item \textbf{Cờ bệnh (has\_cvd):} cột này không có sẵn; $= 1$ nếu có ít nhất một bệnh, $= 0$ nếu cả năm câu trả lời đều ``Không'', NULL nếu thiếu mà không có bệnh nào xác nhận (SEQN 73557 $\rightarrow$ 1; SEQN 93705 $\rightarrow$ 0).
+\item \textbf{Sinh khóa dimension:} phân lớp các giá trị liên tục thành khóa dimension: tuổi $\rightarrow$ nhóm 10 năm (66 tuổi $\rightarrow$ nhóm 60--69, \code{age_group_key} = 5); BMI $\rightarrow$ ngưỡng WHO (31,7 $\rightarrow$ Obese I, khóa 4); huyết áp $\rightarrow$ ACC/AHA 2017 (200/68 $\rightarrow$ Hypertension Stage 2, khóa 4); cholesterol $\rightarrow$ ATP III (157 $\rightarrow$ Desirable, khóa 1); PIR $\rightarrow$ 4 mức thu nhập (0,82 $\rightarrow$ Below poverty, khóa 1); năm cờ bệnh $\rightarrow$ khóa \code{dim_cvd_profile} (ví dụ chỉ có đột quỵ $\rightarrow$ khóa 17).
+\item \textbf{Bỏ cột (Drop Columns):} các cột thô sau khi đã biến đổi (\code{BPXSY1--4}, \code{BPXDI1--4}, mã \code{MCQ160B--F}, mã giới tính/chủng tộc/học vấn) và các cột không dùng của từng thành phần.
+\item \textbf{Đổi tên cột (Rename):} đưa về tên thống nhất với nguồn B: \code{RIDAGEYR} $\rightarrow$ \code{age_years}, \code{BMXBMI} $\rightarrow$ \code{bmi}, \code{BMXWAIST} $\rightarrow$ \code{waist_cm}, \code{LBDHDD} $\rightarrow$ \code{hdl_chol}, \code{LBXTC} $\rightarrow$ \code{total_chol}, \code{INDFMPIR} $\rightarrow$ \code{income_ratio}, \code{WTMEC2YR} $\rightarrow$ \code{mec_weight}.
+\end{itemize}
+\end{itemize}
+
+\subsection{Nguồn B: Nhanes\_cvd\_raw.csv}
+\begin{itemize}
+\item \textbf{Làm sạch dữ liệu:}
+\begin{itemize}
+\item \textbf{Mã Có/Không:} cùng quy tắc 1/2/7/9 như nguồn A cho năm cột bệnh (\code{Coronary} gồm 825 người có bệnh, 16.152 không, 62 mã 9, 10.454 trống).
+\item \textbf{Tên cột:} sửa tên viết sai (\code{Total_Colesterol} $\rightarrow$ \code{total_chol}) và chuẩn hóa tên (\code{Systolic_BP} $\rightarrow$ \code{sbp}, \code{C_Reactive} $\rightarrow$ \code{crp_mgl}, \code{Cholesterol} $\rightarrow$ \code{dietary_chol_mg}\ldots).
+\item \textbf{Giá trị bất thường:} dinh dưỡng âm hoặc natri/kali bằng 0 (không khả thi) chuyển thành NULL; ngoài khoảng sinh lý áp dụng như nguồn A (DBP 1, BMI 5, cholesterol 2 giá trị).
+\end{itemize}
+\item \textbf{Xử lý dữ liệu:}
+\begin{itemize}
+\item \textbf{Lọc đối tượng:} giữ người $\geq$ 20 tuổi và có ít nhất một câu trả lời về bệnh tim mạch (27.493 $\rightarrow$ 17.040).
+\item \textbf{Chu kỳ:} nguồn B không có cột chu kỳ; suy ra từ \code{SEQN}: $\leq$ 124.822 $\rightarrow$ ``2017--03/2020'', từ 130.378 trở lên $\rightarrow$ ``2021--2023'' (ví dụ SEQN 109266 $\rightarrow$ 2017--03/2020).
+\item \textbf{Thuộc tính vắng mặt:} giới tính, chủng tộc, học vấn, thu nhập, mạch, cân nặng, chiều cao, HDL không có nên đặt thành viên Unknown hoặc NULL.
+\item \textbf{Dinh dưỡng:} tính \code{na_k_ratio} = natri/kali, cờ \code{high_sodium} (natri $\geq$ 2.300 mg) và \code{low_fiber} (chất xơ $<$ 25 g); giữ người có đủ protein và natri (17.040 $\rightarrow$ 12.505) cho \code{fact_nutrition}.
+\item \textbf{Bỏ cột:} 21 cột vi chất và \code{Moisture} không được dùng.
+\end{itemize}
+\end{itemize}
+
+\subsection{Tích hợp hai nguồn}
+Sau khi biến đổi riêng, hai DataFrame có cùng cấu trúc cột được nối lại (38.612 dòng); loại các \code{SEQN} trùng giữa hai nguồn (kết quả: không có bản ghi trùng). Các cờ dẫn xuất còn lại được tính chung cho cả hai nguồn: \code{is_hypertensive} (SBP $\geq$ 130 hoặc DBP $\geq$ 80), \code{is_obese} (BMI $\geq$ 30), \code{is_high_chol} (cholesterol $\geq$ 240 mg/dL), \code{is_low_hdl} (HDL $<$ 40 ở nam hoặc $<$ 50 ở nữ) và \code{non_hdl_chol} = cholesterol toàn phần $-$ HDL. Các DataFrame cuối (10 dimension, \code{fact_health_exam}, \code{fact_nutrition}) được giữ trong bộ nhớ để nạp ở bước sau. \emph{Bài học:} ở phiên bản đầu, nhóm lấy trung bình cả bốn lần đo huyết áp; khi rà soát phương pháp mới đổi sang bỏ lần đo đầu, vì một quyết định ở tầng ETL ảnh hưởng đến mọi số liệu phía sau.
+
+\section{Load -- Nạp dữ liệu}
+Sau khi biến đổi, dữ liệu được nạp vào cơ sở dữ liệu MySQL để làm kho dữ liệu và phục vụ phân tích. Khác với bài toán có hai tập dữ liệu cùng cấu trúc nạp thành hai bảng thô rồi gộp, ở đề tài này việc tích hợp được thực hiện trong bộ nhớ (do khối lượng dữ liệu nhỏ), và chỉ dữ liệu đã chuẩn hóa được nạp. Quy trình nạp theo các bước:
+\begin{enumerate}
+\item Tạo database \code{cvd_dw} nếu chưa có.
+\item Xóa các view/bảng cũ (tắt tạm kiểm tra khóa ngoại) rồi chạy \code{schema.sql} để dựng lại cấu trúc -- \emph{full refresh}, bảo đảm idempotent.
+\item Nạp \textbf{10 bảng dimension} trước, rồi \textbf{2 bảng fact} theo lô 5.000 dòng (đúng thứ tự khóa ngoại); giá trị thiếu (NaN) chuyển thành NULL.
+\item Ghi \textbf{nhật ký ETL} (\code{etl_log}).
+\item \textbf{Lưu sẵn (materialize)} bảng phẳng \code{olap_exam} từ view \code{v_exam} (nối fact với 10 dimension), thêm khóa chính và chỉ mục, rồi chạy \code{ANALYZE TABLE} để cập nhật thống kê cho trình tối ưu.
+\end{enumerate}
+Luồng dữ liệu tổng thể (Hình~\ref{fig:etlflow}):
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  st/.style={draw,rounded corners,align=center,font=\scriptsize,fill=black!4,minimum height=1.1cm,text width=1.9cm,inner sep=2pt},
+  arr/.style={-{Stealth[length=2mm]},thick}]
+ \node[st] (a) {File XPT và CSV (\code{data/raw})};
+ \node[st,right=0.35cm of a] (b) {DataFrame thô (pandas)};
+ \node[st,right=0.35cm of b] (c) {DataFrame đã biến đổi, tích hợp};
+ \node[st,right=0.35cm of c,fill=accent!12,draw=accent] (d) {10 dimension và 2 fact (MySQL)};
+ \node[st,right=0.35cm of d,fill=accent!12,draw=accent] (e) {\code{olap_exam} (bảng phẳng)};
+ \node[st,right=0.35cm of e] (f) {Tầng OLAP và dashboard};
+ \foreach \x/\y in {a/b,b/c,c/d,d/e,e/f}{\draw[arr] (\x) -- (\y);}
+\end{tikzpicture}
+\caption{Luồng dữ liệu của quy trình ETL}\label{fig:etlflow}
+\end{figure}
+\textbf{Bảng phân tích cuối.} Từ các bảng fact và dimension, nhóm tạo view \code{v_exam} nối chúng lại, rồi lưu sẵn (materialize) thành bảng \code{olap_exam}; đây là nguồn dữ liệu cuối cùng cho dashboard, OLAP và DSS (tương tự view phân tích làm nguồn cho dashboard trong các hệ BI khác). Thay vì kết nối dashboard trực tiếp tới các bảng fact và dimension, việc kết nối tới bảng phẳng giúp nhất quán, đơn giản hóa truy vấn và nhanh hơn khoảng 60 lần (0,1 giây so với khoảng 6 giây khi join 11 bảng).
+\begin{lstlisting}[language=SQL]
+CREATE TABLE olap_exam AS SELECT * FROM v_exam;       -- vat chat hoa
+ALTER TABLE olap_exam ADD PRIMARY KEY (exam_id);
+CREATE INDEX ix_olap_cycle ON olap_exam(cycle_label);
+ANALYZE TABLE olap_exam;
+\end{lstlisting}
+
+\textbf{Kết quả và nhật ký ETL.} Toàn bộ ETL mất khoảng 25 giây và nạp 38.612 bản ghi khám, 12.505 bản ghi dinh dưỡng. Bảng~\ref{tab:etllog} trích nhật ký ETL (\code{etl_log}).
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption[Trích nhật ký ETL]{Trích nhật ký ETL (\code{etl_log})}\label{tab:etllog}
+\small
+\begin{tabular}{|l|l|r|r|}
+\hline
+\textbf{Bước} & \textbf{Chi tiết} & \textbf{Input} & \textbf{Output} \\ \hline
+Lọc & Nguồn A: người $\geq$ 20 tuổi & 39.156 & 22.617 \\ \hline
+Lọc & Nguồn A: bỏ người không được khám & 22.617 & 21.572 \\ \hline
+Lọc & Nguồn B: $\geq$ 20 tuổi, có nhãn bệnh & 27.493 & 17.040 \\ \hline
+Loại bản ghi trùng & SEQN trùng giữa hai nguồn & 38.612 & 38.612 \\ \hline
+Lọc & Dinh dưỡng: có protein và natri & 17.040 & 12.505 \\ \hline
+Outlier $\rightarrow$ NULL & DBP 126, BMI 10, cholesterol 10, HDL 13 giá trị & \multicolumn{2}{r|}{(dưới 0,5\%)} \\ \hline
+\end{tabular}
+\end{table}
+Dữ liệu nguồn nhìn chung sạch: công sức của ETL nằm ở việc \emph{giải mã} (mã đặc biệt, quy ước đo) và \emph{tích hợp} hai nguồn khác cấu trúc hơn là sửa dữ liệu hỏng.

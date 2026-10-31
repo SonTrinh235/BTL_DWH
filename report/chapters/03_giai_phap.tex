@@ -1,0 +1,180 @@
+\chapter{Giải pháp đề xuất}
+
+\section{Tổng quan giải pháp}
+Giải pháp là một hệ thống BI/DSS hoàn chỉnh trên kho dữ liệu: (1) ETL tích hợp hai nguồn NHANES vào kho dữ liệu đa chiều MySQL; (2) tầng OLAP và dashboard để khám phá, chẩn đoán; (3) thành phần DSS gồm mô hình nguy cơ, mô phỏng can thiệp, tối ưu phân bổ ngân sách và cảnh báo xu hướng. Toàn bộ mã nguồn, truy vấn mẫu (\code{src/sql/truy_van_olap.sql}) và kiểm thử được cung cấp kèm báo cáo.
+
+\section{Sơ đồ kiến trúc hệ thống}
+Hệ thống gồm bốn tầng: nguồn dữ liệu, ETL, kho dữ liệu, và tầng khai thác (OLAP, dashboard, DSS) như Hình~\ref{fig:arch}.
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\resizebox{\linewidth}{!}{\input{figures/arch.tex}}
+\caption{Kiến trúc tổng thể của hệ thống}\label{fig:arch}
+\end{figure}
+\end{landscape}
+
+\section{Mô hình dữ liệu}
+Kho dữ liệu được thiết kế theo mô hình sao (star schema) theo phương pháp Kimball \cite{kimball2013}: chọn quy trình nghiệp vụ, xác định độ chi tiết (grain), dimension và fact. Cấu trúc này giúp truy vấn hiệu quả và khám phá dữ liệu trực quan nhờ tách các bảng fact (chứa số đo) khỏi các bảng dimension (chứa ngữ cảnh). Vì có hai quy trình nghiệp vụ (khám sức khỏe, khẩu phần ăn) dùng chung nhiều dimension, mô hình có dạng \emph{fact constellation}: hai bảng fact và mười bảng dimension (Hình~\ref{fig:erd}).
+
+\subsection{Bảng fact}
+\textbf{1. Fact Health Exam (\code{fact_health_exam}).} Ghi nhận mỗi lượt khám sức khỏe của một người trưởng thành trong một chu kỳ khảo sát.
+\begin{itemize}
+\item \textbf{Grain:} một dòng cho mỗi người trưởng thành ($\geq$ 20 tuổi) được khám trong một chu kỳ (ngưỡng 20 tuổi do bộ câu hỏi bệnh tim mạch chỉ hỏi người lớn).
+\item \textbf{Khóa chính:} \code{exam_id} (= SEQN của NHANES, degenerate dimension).
+\item \textbf{Khóa ngoại:} \code{cycle_key}, \code{sex_key}, \code{race_key}, \code{education_key}, \code{income_key}, \code{age_group_key}, \code{bmi_category_key}, \code{bp_category_key}, \code{chol_category_key}, \code{cvd_profile_key}.
+\item \textbf{Measure:} \code{age_years}, \code{sbp}, \code{dbp}, \code{pulse}, \code{bmi}, \code{waist_cm}, \code{weight_kg}, \code{height_cm}, \code{total_chol}, \code{hdl_chol}, \code{non_hdl_chol}, \code{crp_mgl}, \code{income_ratio}, \code{mec_weight}.
+\item \textbf{Cờ 0/1:} \code{has_cvd}, \code{is_hypertensive}, \code{is_obese}, \code{is_high_chol}, \code{is_low_hdl}. Chỉ số nghiệp vụ chính là tỷ lệ hiện mắc nên mỗi chỉ số lưu dưới dạng cờ 0/1: \code{AVG(cờ)} cho đúng tỷ lệ ở mọi mức tổng hợp (kể cả roll-up/cube), cờ NULL tự bị bỏ qua.
+\end{itemize}
+\textbf{2. Fact Nutrition (\code{fact_nutrition}).} Ghi nhận khẩu phần ăn 24 giờ của người tham gia (nguồn Nhanes\_cvd\_raw.csv).
+\begin{itemize}
+\item \textbf{Grain:} một dòng cho mỗi người có dữ liệu ăn uống 24 giờ.
+\item \textbf{Khóa chính:} \code{exam_id}, đồng thời là khóa ngoại tới \code{fact_health_exam}.
+\item \textbf{Khóa ngoại:} \code{cycle_key}, \code{age_group_key}, \code{bmi_category_key}, \code{bp_category_key}, \code{cvd_profile_key}.
+\item \textbf{Measure:} \code{protein_g}, \code{carbohydrate_g}, \code{sugar_g}, \code{fiber_g}, \code{saturated_fat_g}, \code{monounsat_fat_g}, \code{polyunsat_fat_g}, \code{dietary_chol_mg}, \code{sodium_mg}, \code{potassium_mg}, \code{calcium_mg}, \code{magnesium_mg}, \code{vitamin_d_mcg}, \code{na_k_ratio}; cờ \code{high_sodium}, \code{low_fiber}.
+\end{itemize}
+
+\subsection{Bảng dimension}
+\begin{itemize}
+\item \textbf{Dim Cycle} (\code{dim_cycle}): cycle\_key, cycle\_label, start\_year, end\_year, period\_group, source\_system. Là chiều thời gian: NHANES công bố theo chu kỳ hai năm, không có ngày khám chính xác nên không dùng bảng ngày.
+\item \textbf{Dim Sex} (\code{dim_sex}): sex\_key, sex.
+\item \textbf{Dim Race} (\code{dim_race}): race\_key, race, race\_group.
+\item \textbf{Dim Education} (\code{dim_education}): education\_key, education, education\_level.
+\item \textbf{Dim Income} (\code{dim_income}): income\_key, income\_band, sort\_order (theo tỷ lệ thu nhập/ngưỡng nghèo PIR).
+\item \textbf{Dim Age Group} (\code{dim_age_group}): age\_group\_key, age\_group, life\_stage, min\_age, max\_age.
+\item \textbf{Dim BMI Category} (\code{dim_bmi_category}): bmi\_category\_key, bmi\_category, weight\_status, sort\_order.
+\item \textbf{Dim BP Category} (\code{dim_bp_category}): bp\_category\_key, bp\_category, bp\_group, sort\_order.
+\item \textbf{Dim Cholesterol Category} (\code{dim_chol_category}): chol\_category\_key, chol\_category, sort\_order.
+\item \textbf{Dim CVD Profile} (\code{dim_cvd_profile}): cvd\_profile\_key, chf, chd, angina, heart\_attack, stroke, n\_conditions, profile\_label, cvd\_group.
+\end{itemize}
+\emph{Lưu ý:} \code{dim_cycle}, \code{dim_age_group}, \code{dim_bmi_category}, \code{dim_bp_category} và \code{dim_cvd_profile} là các dimension dùng chung (conformed) cho cả hai bảng fact, bảo đảm kết quả hai bảng so sánh được với nhau.
+
+\subsection{Các quyết định thiết kế}
+\begin{itemize}
+\item \textbf{Star thay vì snowflake:} các phân cấp chỉ có hai mức và vài giá trị, chuẩn hóa chỉ thêm JOIN mà không tiết kiệm đáng kể; phân cấp được giữ trong cùng bảng dimension dưới dạng hai cột (thô và chi tiết).
+\item \textbf{Thành viên Unknown (khóa 0)} ở mọi dimension: bản ghi thiếu thuộc tính vẫn có khóa ngoại hợp lệ nên không bị mất khi JOIN, và phần dữ liệu không xác định được hiển thị rõ ràng.
+\item \textbf{Junk dimension} \code{dim_cvd_profile} gom 5 cờ bệnh (suy tim, mạch vành, đau thắt ngực, nhồi máu, đột quỵ) thành 33 tổ hợp, cho phép lọc ``người mắc nhiều bệnh'' dễ dàng.
+\end{itemize}
+Hình~\ref{fig:erd} là sơ đồ thực thể--quan hệ của hai bảng fact và 10 dimension (khóa PK/FK, tên cột, kiểu dữ liệu đúng như DDL trên MySQL).
+\begin{landscape}
+\begin{figure}[p]
+\centering
+\resizebox{\linewidth}{!}{\input{figures/erd.tex}}
+\caption{Sơ đồ ERD (star schema): 2 bảng fact và 10 dimension; hàng trên là 5 dimension dùng chung}\label{fig:erd}
+\end{figure}
+\end{landscape}
+
+\textbf{Thiết kế vật lý.} InnoDB với 16 khóa ngoại và chỉ mục trên các khóa thường dùng. Truy vấn trực tiếp qua view nối fact với 10 dimension mất khoảng 6 giây/câu do chi phí \emph{lập kế hoạch} join 11 bảng của MySQL (giảm \code{optimizer_search_depth} từ 62 xuống 0 chỉ còn 1,6 giây). Vì MySQL không có materialized view, nhóm lưu sẵn (materialize) view thành bảng phẳng \code{olap_exam} lúc ETL (có khóa chính, chỉ mục); truy vấn tổng hợp còn khoảng \textbf{0,1 giây}, nhanh hơn $\approx$ 60 lần. Star schema vẫn là kho chính; \code{olap_exam} chỉ là bản sao tối ưu cho đọc, dựng lại mỗi lần ETL.
+
+\section{Công nghệ BI và liên quan}
+\begin{itemize}
+\item \textbf{OLAP (\code{src/olap.py}):} lớp truy vấn đa chiều dùng chung cho dashboard và DSS; tên chiều/thước đo qua danh sách trắng, giá trị lọc qua tham số, phiên MySQL chỉ đọc (chống SQL injection).
+\item \textbf{Dashboard (Streamlit + Plotly):} năm trang, bộ lọc tương tác, tải CSV.
+\item \textbf{DSS (\code{src/dss/}):} mô hình nguy cơ (scikit-learn) và bộ máy what-if, tối ưu, cảnh báo.
+\end{itemize}
+
+\section{Ma trận bus}
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Ma trận bus: dimension dùng chung giữa các quy trình nghiệp vụ}
+\small
+\begin{tabular}{|p{8.2cm}|c|c|}
+\hline
+\textbf{Dimension} & \textbf{fact\_health\_exam} & \textbf{fact\_nutrition} \\ \hline
+Chu kỳ khảo sát, Nhóm tuổi, Phân loại BMI, Phân loại huyết áp, Hồ sơ bệnh tim mạch & $\checkmark$ & $\checkmark$ \\ \hline
+Giới tính, Chủng tộc, Học vấn, Thu nhập, Phân loại cholesterol & $\checkmark$ & \\ \hline
+\end{tabular}
+\end{table}
+
+\section{Mô hình phân tích}
+\subsection{Quan hệ đa chiều và phép toán OLAP}
+Các thước đo (số người, tỷ lệ CVD, tăng huyết áp, béo phì\ldots) được cắt theo 18 thuộc tính chiều. Các phép toán OLAP và cách hiện thực trên MySQL:
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Phép toán OLAP và cách hiện thực}
+\small
+\begin{tabularx}{\textwidth}{|p{2.2cm}|p{4.6cm}|X|}
+\hline
+\textbf{Phép toán} & \textbf{Ý nghĩa} & \textbf{Hiện thực} \\ \hline
+Slice / Dice & Cố định / lọc nhiều giá trị các chiều & \code{WHERE dim IN (\ldots)} \\ \hline
+Roll-up & Tổng hợp lên mức cao, có tổng phụ & \code{GROUP BY a, b WITH ROLLUP} \\ \hline
+Drill-down & Khoan xuống mức chi tiết & truy vấn mức 2 giới hạn theo giá trị mức 1 \\ \hline
+Pivot & Xoay chiều hàng/cột & tổng hợp 2 chiều rồi xoay (\code{CASE} hoặc pandas) \\ \hline
+Cube & Tổng phụ mọi tổ hợp chiều & MySQL không có \code{CUBE}: \code{UNION ALL} $2^k$ tập con \\ \hline
+\end{tabularx}
+\end{table}
+Các câu truy vấn mẫu cho từng phép toán nằm trong file \code{src/sql/truy_van_olap.sql} (22 câu, chạy được trên MySQL Workbench).
+
+\subsection{Phân cấp phục vụ drill-down}
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Bảy phân cấp (thô $\rightarrow$ chi tiết)}
+\small
+\begin{tabularx}{\textwidth}{|p{3.2cm}|X|}
+\hline
+\textbf{Phân cấp} & \textbf{Các mức} \\ \hline
+Thời gian & giai đoạn (2011--2018 / 2017--2023) $\rightarrow$ chu kỳ \\ \hline
+Tuổi & giai đoạn đời (trẻ / trung niên / cao tuổi) $\rightarrow$ nhóm 10 tuổi \\ \hline
+Chủng tộc & Hispanic / không $\rightarrow$ 5 nhóm NHANES \\ \hline
+Học vấn & thấp / trung bình / cao $\rightarrow$ 5 mức \\ \hline
+Cân nặng & thừa cân / bình thường / thiếu cân $\rightarrow$ 6 mức BMI (WHO) \\ \hline
+Huyết áp & bình thường / tăng huyết áp $\rightarrow$ 4 mức (ACC/AHA 2017 \cite{acc_aha2017}) \\ \hline
+Bệnh tim mạch & nhóm (không / một bệnh / nhiều bệnh) $\rightarrow$ tổ hợp bệnh \\ \hline
+\end{tabularx}
+\end{table}
+
+\subsection{Các thước đo tính toán}
+Các chỉ số chính sau được hiện thực trong mô hình phân tích; mỗi chỉ số là một biểu thức SQL (\code{src/olap.py}) áp dụng cho tập bản ghi sau khi cắt theo các chiều. Ký hiệu $\mathbb{1}[\cdot]$ là hàm chỉ thị (bằng 1 nếu điều kiện đúng, ngược lại bằng 0); \code{COUNT} và \code{AVG} bỏ qua giá trị NULL.
+
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Các thước đo tính toán thiết yếu}
+\small
+\renewcommand{\arraystretch}{1.5}
+\begin{tabularx}{\textwidth}{|p{3.5cm}|X|}
+\hline
+\textbf{Thước đo} & \textbf{Công thức} \\ \hline
+Số người (People) & $\displaystyle \text{People} = \mathrm{COUNT}(\text{exam\_id})$ \\ \hline
+Số ca CVD & $\displaystyle \text{CVD cases} = \sum \text{has\_cvd}$ \\ \hline
+Tỷ lệ mắc CVD & $\displaystyle \text{CVD}\% = \frac{\sum \text{has\_cvd}}{\mathrm{COUNT}(\text{has\_cvd})}\times 100 = \mathrm{AVG}(\text{has\_cvd})\times 100$ \\ \hline
+Tỷ lệ tăng huyết áp & $\displaystyle \mathrm{AVG}(\text{is\_hypertensive})\times 100,\quad \text{is\_hypertensive}=\mathbb{1}[\mathrm{SBP}\ge 130 \ \lor\ \mathrm{DBP}\ge 80]$ \\ \hline
+Tỷ lệ béo phì & $\displaystyle \mathrm{AVG}(\text{is\_obese})\times 100,\quad \text{is\_obese}=\mathbb{1}[\mathrm{BMI}\ge 30]$ \\ \hline
+Tỷ lệ cholesterol cao & $\displaystyle \mathrm{AVG}(\text{is\_high\_chol})\times 100,\quad \text{is\_high\_chol}=\mathbb{1}[\mathrm{TC}\ge 240]$ \\ \hline
+Tỷ lệ HDL thấp & $\displaystyle \mathrm{AVG}(\text{is\_low\_hdl})\times 100,\quad \text{is\_low\_hdl}=\mathbb{1}[\mathrm{HDL}<40\ (\text{nam})\ \lor\ \mathrm{HDL}<50\ (\text{nữ})]$ \\ \hline
+Chỉ số trung bình & $\displaystyle \bar{x}=\frac{\sum x}{\mathrm{COUNT}(x)},\quad x\in\{\mathrm{SBP},\mathrm{DBP},\mathrm{BMI},\text{vòng eo},\mathrm{TC},\mathrm{HDL},\mathrm{CRP}\}$ \\ \hline
+Tỷ lệ Na/K & $\displaystyle \text{Na/K}=\frac{\text{sodium\_mg}}{\text{potassium\_mg}}$ \\ \hline
+Tỷ lệ ăn mặn & $\displaystyle \mathrm{AVG}(\text{high\_sodium})\times 100,\quad \text{high\_sodium}=\mathbb{1}[\text{sodium\_mg}\ge 2300]$ \\ \hline
+Thay đổi giữa hai chu kỳ & $\displaystyle \Delta = (\hat p_2-\hat p_1)\times 100\ \text{(điểm phần trăm)}$ \\ \hline
+Giảm nguy cơ tuyệt đối (DSS) & $\displaystyle a_i=\overline{p_0-p_1}$ trong phân khúc $i$; \quad ca bệnh tránh được trên 1.000 người $=1000\times(\overline{p_0}-\overline{p_1})$ \\ \hline
+Ca bệnh tránh được của phân khúc & $\displaystyle \text{Cases}_i = x_i\, N_i\, a_i$, với $x_i$ là độ phủ, $N_i$ là quy mô phân khúc \\ \hline
+\end{tabularx}
+\end{table}
+Trong đó SBP/DBP là huyết áp tâm thu/tâm trương (mmHg), TC là cholesterol toàn phần (mg/dL), $p_0$ và $p_1$ là xác suất mắc CVD trước và sau can thiệp (Mục~3.7). Các thước đo \emph{tỷ lệ} dùng cờ 0/1 nên cùng một công thức $\mathrm{AVG}(\text{cờ})$ đúng ở mọi mức tổng hợp, kể cả dòng tổng phụ của roll-up và cube.
+
+\section{Thành phần hỗ trợ quyết định (DSS)}
+DSS gồm ba thành phần: \emph{dữ liệu} (kho MySQL), \emph{mô hình} (mô hình nguy cơ, hệ số can thiệp, thuật toán chọn ưu tiên) và \emph{giao diện người dùng} (trang DSS). Hệ thống có bốn công cụ, đều đọc dữ liệu từ kho và ứng với ba giai đoạn ra quyết định của Simon \cite{simon1960}: \textbf{intelligence} (cảnh báo xu hướng), \textbf{design} (what-if, so sánh các kịch bản can thiệp) và \textbf{choice} (đánh giá cá nhân, chọn nhóm ưu tiên).
+
+\subsection{Mô hình nguy cơ}
+Mô hình logistic regression ước lượng xác suất một người mắc CVD, huấn luyện từ kho dữ liệu trên 21.479 người (biến mục tiêu \code{has_cvd}). Đây là mô hình \emph{tỷ lệ hiện mắc} cắt ngang, không dự báo biến cố tương lai. Đặc trưng gồm tuổi, giới, SBP, BMI, HDL; cholesterol toàn phần và DBP bị loại vì hệ số sai dấu y học ($-0{,}31$ và $-0{,}09$), nhiều khả năng do người bệnh đã dùng thuốc (chưa kiểm chứng được vì dữ liệu không có thông tin thuốc). Trên tập kiểm tra 25\% (n = 5.370), mô hình đạt AUC 0,794 (gradient boosting: 0,796) và Brier 0,0859 so với 0,0977 của mô hình nền.
+
+\subsection{Đánh giá nguy cơ cá nhân}
+Từ tuổi, giới, huyết áp, BMI, cholesterol và HDL, hệ thống trả về xác suất mắc CVD, mức nguy cơ, tỷ lệ thực tế của nhóm cùng giới và tuổi trong kho, cùng khuyến nghị theo hướng dẫn lâm sàng (ACC/AHA 2017 \cite{acc_aha2017}, ATP III \cite{atp3}, WHO). \emph{Ví dụ:} nam 58 tuổi, huyết áp 142/88, BMI 29,5, cholesterol 225, HDL 42 có xác suất 14,2\% (nhóm cùng tuổi/giới: 14,6\%); nếu đạt mục tiêu điều trị, xác suất còn 5,9\%.
+
+\subsection{Mô phỏng what-if}
+Hiệu quả can thiệp lấy từ nguy cơ tương đối (RR) trong y văn, vì dữ liệu cắt ngang không ước lượng được tác động điều trị. Với mức giảm $\Delta S$ mmHg huyết áp, $\Delta T$ mg/dL cholesterol và $\Delta B$ đơn vị BMI, nguy cơ sau can thiệp là
+\[
+p_1 = p_0\cdot RR,\qquad RR = 1 - \rho\Bigl(1 - RR_S^{\,\Delta S/10}\cdot RR_T^{\,\Delta T/38{,}7}\cdot RR_B^{\,\Delta B}\Bigr),
+\]
+với $p_0$ là xác suất nền của mô hình. Các tham số mặc định: $RR_S = 0{,}80$ khi giảm 10 mmHg \cite{ettehad2016}; $RR_T = 0{,}78$ khi giảm 1 mmol/L \cite{ctt2010}; $RR_B = 0{,}953$ mỗi đơn vị BMI (giả định minh họa, cần đối chiếu số gốc \cite{erfc2011}); $\rho = 0{,}6$ là tỷ lệ hiệu quả đạt được ngoài thực tế. Mức giảm bị chặn ở ngưỡng mục tiêu (SBP 120, cholesterol 199, BMI 24,9). \emph{Kết quả:} với mức giảm 10 mmHg, 30 mg/dL và 1,5 đơn vị BMI, nguy cơ trung bình giảm từ 11,0\% xuống 9,7\% (13,0 ca bệnh tránh được/1.000 người); ở nhóm tăng huyết áp từ 60 tuổi là từ 24,6\% xuống 20,7\% (39,5 ca/1.000).
+
+\subsection{Phân bổ nguồn lực ưu tiên}
+Hệ thống chia dân số thành các phân khúc (tuổi $\times$ huyết áp), tính giảm nguy cơ tuyệt đối trung bình mỗi người $a_i=\overline{p_0-p_1}$ của từng phân khúc, rồi ưu tiên phân khúc có $a_i$ trên mỗi đồng chi phí cao nhất cho tới khi hết ngân sách (bài toán knapsack phân số, nghiệm bằng thuật toán tham lam), và so sánh với phương án chia đều. Dân số, chi phí mỗi người và ngân sách là \emph{tham số giả định do người dùng nhập}, không có trong kho. \emph{Ví dụ} (100.000 người, 300 USD/người, ngân sách 2.000.000 USD): ưu tiên nhóm 80+ và 70--79 tuổi có tăng huyết áp tránh được 348 ca bệnh so với 87 ca nếu chia đều.
+
+\subsection{Cảnh báo xu hướng}
+Hệ thống so sánh tỷ lệ của một chỉ báo giữa hai chu kỳ bằng kiểm định $z$ hai tỷ lệ; nhóm được gắn \emph{Rising} nếu $z \ge 1{,}96$, \emph{Falling} nếu $z \le -1{,}96$, ngược lại \emph{Stable}. \emph{Ví dụ} (2011--2012 $\rightarrow$ 2017--2018): tăng huyết áp tăng từ 40,2\% lên 47,9\% ở nhóm không gốc Tây Ban Nha ($z$ = 6,83); béo phì tăng 9,0 điểm phần trăm ở nhóm 20--29 tuổi ($z$ = 3,92).
+
+\subsection{Giả định của DSS}
+Mô hình là hiện mắc cắt ngang, không chứng minh nhân quả; RR từ thử nghiệm lâm sàng được áp lên dân số khảo sát; các hiệu ứng được coi là độc lập; kiểm định $z$ chưa tính thiết kế mẫu phức hợp của NHANES. Mọi tham số đều chỉnh được trên giao diện.

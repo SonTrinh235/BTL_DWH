@@ -1,0 +1,48 @@
+\begin{tikzpicture}[x=1cm,y=1cm,
+  b/.style={draw=black!60, rounded corners=2pt, fill=white, align=center, font=\small, text width=5.3cm, minimum height=1.3cm, inner sep=3pt, line width=0.6pt},
+  tab/.style={text=white, font=\bfseries\small, inner sep=4pt, anchor=south west},
+  arr/.style={-{Stealth[length=2.6mm]}, line width=1pt, black!70}]
+ % ---------------- Lane 1: nguồn dữ liệu
+ \node[b] (s0) at (0,3.6) {\textbf{CDC NHANES}\\khảo sát sức khỏe và dinh dưỡng\\của Hoa Kỳ (dữ liệu mở)};
+ \node[b,minimum height=2.3cm] (s1) at (0,0.6) {\textbf{24 file XPT}\\DEMO · BMX · BPX\\HDL · TCHOL · MCQ\\4 chu kỳ 2011--2018};
+ \node[b,minimum height=2.3cm] (s2) at (0,-2.6) {\textbf{Nhanes\_cvd\_raw.csv}\\dinh dưỡng · CRP · nhãn CVD\\2017--2023\\27.493 dòng};
+ % ---------------- Lane 2: ETL
+ \node[b] (e1) at (8.2,3.6) {\textbf{Extract}\\\texttt{read\_sas} · \texttt{read\_csv}\\6 bảng $\times$ 4 chu kỳ + 1 CSV};
+ \node[b,minimum height=4.1cm] (e2) at (8.2,-0.2) {\textbf{Transform}\\[3pt]
+   \begin{tabular}{@{}l@{}}$\bullet$ lọc người $\geq$ 20 tuổi\\$\bullet$ xử lý mã 7/9, DBP = 0, outlier\\$\bullet$ huyết áp: trung bình lần đo 2--4\\$\bullet$ tích hợp hai nguồn theo SEQN\\$\bullet$ tính measure và cờ 0/1\\$\bullet$ sinh khóa dimension\end{tabular}};
+ \node[b] (e3) at (8.2,-3.9) {\textbf{Load}\\SQLAlchemy + PyMySQL\\full refresh · bulk insert · ANALYZE};
+ % ---------------- Lane 3: kho dữ liệu
+ \node[b] (d1) at (16.4,3.6) {\textbf{10 bảng dimension}\\5 bảng dùng chung giữa 2 fact};
+ \node[b] (d2) at (16.4,1.6) {\textbf{fact\_health\_exam}\\38.612 dòng};
+ \node[b] (d3) at (16.4,-0.4) {\textbf{fact\_nutrition}\\12.505 dòng};
+ \node[b] (d4) at (16.4,-2.4) {\textbf{olap\_exam}\\bảng phẳng lưu sẵn};
+ \node[b] (d5) at (16.4,-4.4) {\textbf{etl\_log}\\nhật ký ETL (log)};
+ % ---------------- Lane 4: khai thác
+ \node[b] (a1) at (24.6,2.6) {\textbf{Tầng OLAP} (\texttt{olap.py})\\slice · dice · roll-up\\drill-down · pivot · cube};
+ \node[b] (a2) at (24.6,-0.4) {\textbf{Dashboard}\\Streamlit + Plotly, 5 trang};
+ \node[b,minimum height=2cm] (a3) at (24.6,-3.4) {\textbf{DSS} (scikit-learn)\\nguy cơ cá nhân · what-if\\phân bổ ngân sách\\cảnh báo xu hướng};
+ % ---------------- Lane nền
+ \begin{scope}[on background layer]
+  \node[fit=(s0)(s1)(s2), fill=orange!13, draw=orange!70!black, rounded corners=4pt, inner sep=9pt, line width=0.9pt] (L1) {};
+  \node[fit=(e1)(e2)(e3), fill=green!11, draw=green!55!black, rounded corners=4pt, inner sep=9pt, line width=0.9pt] (L2) {};
+  \node[fit=(d1)(d2)(d3)(d4)(d5), fill=cyan!11, draw=cyan!55!black, rounded corners=4pt, inner sep=9pt, line width=0.9pt] (L3) {};
+  \node[fit=(a1)(a2)(a3), fill=yellow!16, draw=yellow!60!black, rounded corners=4pt, inner sep=9pt, line width=0.9pt] (L4) {};
+ \end{scope}
+ \node[tab, fill=orange!80!black] at (L1.north west) {1. Nguồn dữ liệu};
+ \node[tab, fill=green!50!black] at (L2.north west) {2. ETL (Python, pandas)};
+ \node[tab, fill=cyan!50!black] at (L3.north west) {3. Kho dữ liệu (MySQL 8.0)};
+ \node[tab, fill=yellow!55!black] at (L4.north west) {4. Khai thác và hỗ trợ quyết định};
+ \node[b, text width=3.4cm, fill=black!5] (u) at (31.8,-0.4) {\textbf{Người dùng}\\lãnh đạo y tế\\chuyên viên chương trình\\nhà phân tích};
+ % ---------------- Luồng dữ liệu
+ \draw[arr] (s0) -- (s1);
+ \draw[arr] (L1.east |- e1) -- (e1);
+ \draw[arr] (e1) -- (e2);
+ \draw[arr] (e2) -- (e3);
+ \draw[arr] (L2.east |- d2) -- (L3.west |- d2);
+ \draw[arr] (d4.east) -- ++(1.0,0) |- (a1.west);
+ \draw[arr] (d4.east) -- ++(1.0,0) |- (a3.west);
+ \draw[arr] (d3.east) -- ++(1.5,0) |- (a1.west);
+ \draw[arr] (a1) -- (a2);
+ \draw[arr] (a3) -- (a2);
+ \draw[arr] (a2.east) -- (u.west |- a2.east);
+\end{tikzpicture}

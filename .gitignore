@@ -1,0 +1,16 @@
+.env
+__pycache__/
+.pytest_cache/
+warehouse/
+dist/
+*.zip
+report/main.pdf
+report/*.aux
+report/*.log
+report/*.toc
+report/*.lof
+report/*.lot
+report/*.out
+report/*.xdv
+report/*.fls
+report/*.fdb_latexmk

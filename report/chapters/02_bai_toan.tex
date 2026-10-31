@@ -1,0 +1,56 @@
+\chapter{Bài toán nghiệp vụ}\label{ch:business}
+
+\section{Phát biểu bài toán}
+Một cơ quan y tế công cộng (ví dụ sở y tế một tỉnh/thành) muốn triển khai chương trình sàng lọc và can thiệp yếu tố nguy cơ tim mạch cho người trưởng thành, nhưng gặp năm khó khăn:
+\begin{enumerate}
+\item \textbf{Dữ liệu phân mảnh:} số liệu khảo sát nằm trong nhiều file theo chu kỳ và loại xét nghiệm, mã hóa bằng biến kỹ thuật, không có cái nhìn thống nhất.
+\item \textbf{Thiếu phân tích đa chiều:} các câu hỏi như ``tỷ lệ CVD của nhóm 60--69 tuổi, thừa cân, có tăng huyết áp, thu nhập thấp là bao nhiêu và thay đổi ra sao qua các chu kỳ'' đòi hỏi viết lại mã mỗi lần.
+\item \textbf{Khó tìm nguyên nhân:} khi một nhóm có tỷ lệ cao, không có công cụ khoan sâu để tìm yếu tố đóng góp.
+\item \textbf{Phân bổ nguồn lực theo cảm tính:} không có cách định lượng ``giảm huyết áp cho nhóm A thì tránh được bao nhiêu ca''.
+\item \textbf{Phản ứng muộn:} xu hướng xấu đi chỉ được nhận ra khi đã rõ, vì không có cảnh báo có kiểm định thống kê.
+\end{enumerate}
+
+\section{Bối cảnh bài toán}
+Cơ quan này có 100.000 người trưởng thành trong diện quản lý và ngân sách vài triệu USD. Nhà quản lý cần trả lời các câu hỏi sau, mỗi câu được đáp ứng bởi một chức năng của hệ thống (Chương~\ref{ch:app}):
+\begin{itemize}
+\item \textbf{Q1--Q2.} Tỷ lệ CVD, tăng huyết áp, béo phì hiện nay, qua các chu kỳ, và theo tuổi, giới, chủng tộc, thu nhập? \emph{(Tổng quan, OLAP)}
+\item \textbf{Q3--Q4.} Trong cùng nhóm tuổi, yếu tố nào (cân nặng, huyết áp, cholesterol, khẩu phần ăn) làm khác biệt? \emph{(Phân tích yếu tố nguy cơ)}
+\item \textbf{Q5.} Một cá nhân có nguy cơ cao đến mức nào, nên làm gì? \emph{(DSS: nguy cơ cá nhân)}
+\item \textbf{Q6.} Giảm huyết áp/cholesterol/BMI cho một nhóm thì tránh được bao nhiêu ca? \emph{(DSS: what-if)}
+\item \textbf{Q7.} Với ngân sách hữu hạn, ưu tiên nhóm nào? \emph{(DSS: phân bổ ngân sách)}
+\item \textbf{Q8.} Nhóm nào đang xấu đi có ý nghĩa thống kê? \emph{(DSS: cảnh báo xu hướng)}
+\item \textbf{Q9.} Số liệu có đáng tin không, đã xử lý những gì? \emph{(Kho dữ liệu \& ETL)}
+\end{itemize}
+
+\section{Người ra quyết định và các bên liên quan}
+\begin{table}[H]
+\renewcommand{\arraystretch}{1.35}\setlength{\extrarowheight}{3pt}
+\centering
+\caption{Các bên liên quan và nhu cầu phân tích}
+\small
+\begin{tabularx}{\textwidth}{|p{3.3cm}|p{3.7cm}|X|}
+\hline
+\textbf{Đối tượng} & \textbf{Vai trò} & \textbf{Nhu cầu / quyết định} \\ \hline
+Lãnh đạo y tế công cộng & Phê duyệt ngân sách, chiến lược & Xu hướng; nhóm ưu tiên; so sánh phương án phân bổ \\ \hline
+Chuyên viên chương trình & Thiết kế, triển khai chiến dịch & Quy mô và đặc điểm nhóm nguy cơ; hiệu quả kỳ vọng của can thiệp \\ \hline
+Nhà phân tích dữ liệu & Khai thác dữ liệu, viết báo cáo & Truy vấn đa chiều tự do, xuất kết quả, kiểm tra chất lượng \\ \hline
+Bác sĩ phòng khám & Tư vấn từng người & Nguy cơ cá nhân so với nhóm cùng tuổi/giới, khuyến nghị lâm sàng \\ \hline
+\end{tabularx}
+\end{table}
+Người ra quyết định chính là lãnh đạo và chuyên viên chương trình; quyết định trung tâm là: \emph{chọn nhóm dân số nào và mức độ phủ bao nhiêu với ngân sách cho trước}.
+
+\section{Mục tiêu}
+\subsection{Mục tiêu chính}
+\begin{enumerate}
+\item Xây dựng kho dữ liệu đa chiều tích hợp hai nguồn NHANES, có ETL chạy lại được và ghi nhật ký từng bước.
+\item Cung cấp OLAP và dashboard để trả lời Q1--Q4 và Q9 mà không phải viết lại mã xử lý.
+\item Xây dựng thành phần DSS trả lời Q5--Q8 dựa trên kho dữ liệu.
+\item Đánh giá trung thực kết quả, nêu rõ giả định và hạn chế.
+\end{enumerate}
+\subsection{Tiêu chí thành công}
+\begin{itemize}
+\item Kho dữ liệu nạp được từ nguồn thô bằng một lệnh, toàn vẹn khóa ngoại, không có khóa trùng.
+\item Truy vấn tương tác trên dashboard phản hồi dưới 1 giây.
+\item Mô hình nguy cơ đạt AUC $\geq$ 0,75 trên tập kiểm tra giữ lại và tốt hơn mô hình nền theo chỉ số Brier.
+\item Trả lời được ``nên ưu tiên nhóm nào'' trong tối đa 3 thao tác trên giao diện.
+\end{itemize}

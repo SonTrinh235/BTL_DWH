@@ -1,0 +1,36 @@
+\providecommand{\erdsize}{\scriptsize}
+\tikzset{
+  erd/.style={rectangle split, rectangle split parts=2, align=left, inner sep=3pt, font=\erdsize, line width=0.6pt},
+  rel/.style={black!65, line width=0.7pt, {Bar[width=4pt]}-{Rays[n=3,length=5pt]}},
+}
+
+\begin{tikzpicture}[x=1cm,y=1cm]
+\node[erd, draw=green!65!black, rectangle split part fill={green!38,green!7}] (cycle) at (-10.6,5.6) {\textbf{dim\_cycle}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&cycle\_key&int\\&cycle\_label&varchar\\&start\_year&int\\&end\_year&int\\&period\_group&varchar\\&source\_system&varchar\end{tabular}};
+\node[erd, draw=violet!65!black, rectangle split part fill={violet!38,violet!7}] (age) at (-5.3,5.6) {\textbf{dim\_age\_group}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&age\_group\_key&int\\&age\_group&varchar\\&life\_stage&varchar\\&min\_age&int\\&max\_age&int\end{tabular}};
+\node[erd, draw=orange!65!black, rectangle split part fill={orange!38,orange!7}] (bmi) at (0,5.6) {\textbf{dim\_bmi\_category}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&bmi\_category\_key&int\\&bmi\_category&varchar\\&weight\_status&varchar\\&sort\_order&int\end{tabular}};
+\node[erd, draw=red!65!black, rectangle split part fill={red!38,red!7}] (bp) at (5.3,5.6) {\textbf{dim\_bp\_category}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&bp\_category\_key&int\\&bp\_category&varchar\\&bp\_group&varchar\\&sort\_order&int\end{tabular}};
+\node[erd, draw=magenta!65!black, rectangle split part fill={magenta!38,magenta!7}] (cvd) at (10.6,5.6) {\textbf{dim\_cvd\_profile}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&cvd\_profile\_key&int\\&chf&varchar\\&chd&varchar\\&angina&varchar\\&heart\_attack&varchar\\&stroke&varchar\\&n\_conditions&int\\&profile\_label&varchar\\&cvd\_group&varchar\end{tabular}};
+\node[erd, draw=blue!65!black, rectangle split part fill={blue!38,blue!7}] (sex) at (-12.2,-5.0) {\textbf{dim\_sex}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&sex\_key&int\\&sex&varchar\end{tabular}};
+\node[erd, draw=blue!65!black, rectangle split part fill={blue!38,blue!7}] (race) at (-8.1,-5.0) {\textbf{dim\_race}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&race\_key&int\\&race&varchar\\&race\_group&varchar\end{tabular}};
+\node[erd, draw=blue!65!black, rectangle split part fill={blue!38,blue!7}] (edu) at (-4.0,-5.0) {\textbf{dim\_education}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&education\_key&int\\&education&varchar\\&education\_level&varchar\end{tabular}};
+\node[erd, draw=blue!65!black, rectangle split part fill={blue!38,blue!7}] (inc) at (0.1,-5.0) {\textbf{dim\_income}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&income\_key&int\\&income\_band&varchar\\&sort\_order&int\end{tabular}};
+\node[erd, draw=orange!65!black, rectangle split part fill={orange!38,orange!7}] (chol) at (4.2,-5.0) {\textbf{dim\_chol\_category}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&chol\_category\_key&int\\&chol\_category&varchar\\&sort\_order&int\end{tabular}};
+\node[erd, draw=cyan!65!black, line width=1.2pt, rectangle split part fill={cyan!38,cyan!7}] (fact) at (-4.2,-0.1) {\textbf{fact\_health\_exam}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK&exam\_id&bigint\\FK&cycle\_key&int\\FK&sex\_key&int\\FK&race\_key&int\\FK&education\_key&int\\FK&income\_key&int\\FK&age\_group\_key&int\\FK&bmi\_category\_key&int\\FK&bp\_category\_key&int\\FK&chol\_category\_key&int\\FK&cvd\_profile\_key&int\\&age\_years, sbp, dbp, pulse&double\\&bmi, waist\_cm, weight\_kg, height\_cm&double\\&total\_chol, hdl\_chol, non\_hdl\_chol&double\\&crp\_mgl, income\_ratio, mec\_weight&double\\&has\_cvd, is\_hypertensive, is\_obese&tinyint\\&is\_high\_chol, is\_low\_hdl&tinyint\end{tabular}};
+\node[erd, draw=cyan!65!black, line width=1.2pt, rectangle split part fill={cyan!38,cyan!7}] (fn) at (7.0,0.4) {\textbf{fact\_nutrition}\nodepart{two}\begin{tabular}{@{}l@{\ }l@{\ \ }l@{}}PK,FK&exam\_id&bigint\\FK&cycle\_key&int\\FK&age\_group\_key&int\\FK&bmi\_category\_key&int\\FK&bp\_category\_key&int\\FK&cvd\_profile\_key&int\\&protein, carbohydrate, sugar, fiber (g)&double\\&saturated/mono/polyunsat fat (g)&double\\&dietary\_chol, sodium, potassium (mg)&double\\&calcium, magnesium (mg), vitamin\_d (mcg)&double\\&na\_k\_ratio&double\\&high\_sodium, low\_fiber&tinyint\end{tabular}};
+\draw[rel] (cycle.south) -- ($(fact.north west)!0.1!(fact.north east)$);
+\draw[rel] (age.south) -- ($(fact.north west)!0.30000000000000004!(fact.north east)$);
+\draw[rel] (bmi.south) -- ($(fact.north west)!0.5!(fact.north east)$);
+\draw[rel] (bp.south) -- ($(fact.north west)!0.7000000000000001!(fact.north east)$);
+\draw[rel] (cvd.south) -- ($(fact.north west)!0.9!(fact.north east)$);
+\draw[rel] (cycle.south) -- ($(fn.north west)!0.1!(fn.north east)$);
+\draw[rel] (age.south) -- ($(fn.north west)!0.30000000000000004!(fn.north east)$);
+\draw[rel] (bmi.south) -- ($(fn.north west)!0.5!(fn.north east)$);
+\draw[rel] (bp.south) -- ($(fn.north west)!0.7000000000000001!(fn.north east)$);
+\draw[rel] (cvd.south) -- ($(fn.north west)!0.9!(fn.north east)$);
+\draw[rel] (sex.north) -- ($(fact.south west)!0.1!(fact.south east)$);
+\draw[rel] (race.north) -- ($(fact.south west)!0.30000000000000004!(fact.south east)$);
+\draw[rel] (edu.north) -- ($(fact.south west)!0.5!(fact.south east)$);
+\draw[rel] (inc.north) -- ($(fact.south west)!0.7000000000000001!(fact.south east)$);
+\draw[rel] (chol.north) -- ($(fact.south west)!0.9!(fact.south east)$);
+\draw[rel, dashed] (fn.west) -- node[above, font=\erdsize\itshape]{exam\_id (FK)} (fact.east);
+\end{tikzpicture}
