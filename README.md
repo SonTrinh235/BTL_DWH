@@ -66,11 +66,3 @@ report/              báo cáo LaTeX (main.tex) và PDF (BaoCao_CO4031.pdf)
 2. **What-if** – áp RR từ y văn (huyết áp: Ettehad 2016; cholesterol: CTT 2010; BMI: giả định minh hoạ; tất cả chỉnh được trên giao diện) lên nguy cơ nền từng người trong DW.
 3. **Phân bổ ngân sách** – xếp hạng phân khúc theo ca-tránh-được/chi phí, lấp đầy ngân sách (knapsack phân số); so sánh với chia đều (mặc định 2 triệu USD cho 100.000 người, hiệu quả thực tế 60%: 348 ca vs 87 ca).
 4. **Cảnh báo xu hướng** – kiểm định z hai tỷ lệ giữa hai chu kỳ cho từng nhóm.
-
-## Hạn chế cần nêu trong báo cáo
-* Nhãn CVD là **tự khai báo, cắt ngang** → mô hình là *tỷ lệ hiện mắc*, không dự báo biến cố tương lai.
-* **Nhiễu điều trị**: người bệnh dùng statin/thuốc hạ áp nên cholesterol/huyết áp thấp hơn. Thí nghiệm trong `risk_model.py` cho thấy thêm TC vào mô hình cho hệ số âm (ngược y học) → loại TC, DBP; tác động can thiệp lấy từ RR y văn. Hướng phát triển: dùng bảng thuốc (`DoAnCN/data/main_dataset/medications.csv`) để hiệu chỉnh.
-* Chưa gia quyền theo thiết kế mẫu phức hợp NHANES (`mec_weight` đã được lưu, chỉ có ở nguồn XPT); tỷ lệ là tỷ lệ mẫu.
-* Chu kỳ `2017-2018` (XPT) và `2017-Mar 2020` (CSV) chồng lấn thời gian – so tỷ lệ được, không cộng số người.
-* Nguồn CSV không có giới tính/chủng tộc/thu nhập → các bản ghi đó rơi vào `Unknown`.
-* MySQL (InnoDB, hướng hàng) đủ cho quy mô này; dữ liệu lớn hơn nên dùng kho cột/đám mây (ClickHouse, BigQuery) kèm incremental load và SCD.
